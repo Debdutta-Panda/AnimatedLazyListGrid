@@ -1,20 +1,17 @@
 package com.debduttapanda.animatedlazylistgrid
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -24,7 +21,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -42,21 +39,60 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
                     val vm: MyViewModel by viewModels()
-                    LazyColumn{
+                    /*LazyRow{
                         items(
                             items = vm.numbers,
                             key = {
                                 it
                             },
-                            enter = EnterTransition.None,//fadeIn(tween(700))+ expandVertically(tween(700)),
-                            exit = ExitTransition.None,//fadeOut(tween(700))+ shrinkVertically(tween(700)),
-                            exitDuration = 0
+                            enter = fadeIn(tween(700))+ expandVertically(tween(700)),
+                            exit = fadeOut(tween(700))+ shrinkVertically(tween(700)),
+                            exitDuration = 700
                         ){
                             Text(
                                 it.toString(),
                                 modifier = Modifier
                                     .padding(top = 6.dp)
-                                    .fillMaxWidth()
+                                    .size(100.dp)
+                                    .background(Color.LightGray)
+                                    .padding(12.dp)
+                                    .clickable {
+                                        vm.delete(it)
+                                    }
+                            )
+                        }
+                    }*/
+
+
+                    LazyVerticalGrid(
+                        cells = GridCells.Fixed(3)
+                    ){
+                        /*items(
+                            vm.numbers
+                        ){
+                            Text(
+                                it.toString(),
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .size(100.dp)
+                                    .background(Color.LightGray)
+                                    .padding(12.dp)
+                                    .clickable {
+                                        vm.delete(it)
+                                    }
+                            )
+                        }*/
+                        items(
+                            vm.numbers,
+                            enter = fadeIn(tween(700)),
+                            exit = fadeOut(tween(700)),
+                            exitDuration = 700
+                        ){
+                            Text(
+                                it.toString(),
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .size(100.dp)
                                     .background(Color.LightGray)
                                     .padding(12.dp)
                                     .clickable {
@@ -65,6 +101,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                    Text(vm.numbers.size.toString())
                 }
             }
         }
@@ -114,7 +151,8 @@ class VisibilityList<T>(core: SnapshotStateList<T>){
                 }
             )
         }
-
+    val size
+    get() = visibilityList.size
     val list: SnapshotStateList<VisibleItem<T>>
     get() = visibilityList
 
@@ -171,8 +209,12 @@ class VisibilityList<T>(core: SnapshotStateList<T>){
         }
     }
 
-    fun delete(it: VisibleItem<T>) {
-        visibilityList.remove(it)
+    fun delete(item: VisibleItem<T>) {
+        val index = visibilityList.indexOfFirst {
+            it.data==item.data
+        }
+        val success = visibilityList.removeAt(index)
+        Log.d("fldkfdf","$success")
     }
 }
 
@@ -183,16 +225,19 @@ get(){
 
 inline fun <T> LazyListScope.items(
     items: VisibilityList<T>,
-    noinline key: ((item: T) -> Any),
-    enter: EnterTransition,
-    exit: ExitTransition,
-    exitDuration: Long,
+    noinline key: ((item: T) -> Any)? = null,
+    enter: EnterTransition = EnterTransition.None,
+    exit: ExitTransition = ExitTransition.None,
+    exitDuration: Long = 0,
     crossinline itemContent: @Composable LazyItemScope.(item: T) -> Unit
 ){
     items(
         items.list,
-        key = {
-            key(it.data)
+        key =
+        if(key==null)
+            null
+        else {item: VisibleItem<T>->
+            key(item.data)
         }
     ){
         LaunchedEffect(key1 = it.visible){
@@ -200,7 +245,7 @@ inline fun <T> LazyListScope.items(
                 items.makeVisible(it)
                 return@LaunchedEffect
             }
-            if(it.visible&&it.state==VisibleItem.State.REMOVING){
+            if(!it.visible&&it.state==VisibleItem.State.REMOVING){
                 if(exitDuration>0){
                     items.makeInvisible(it)
                     delay(exitDuration)
@@ -214,6 +259,46 @@ inline fun <T> LazyListScope.items(
             exit = exit
         ) {
             itemContent(it.data)
+        }
+    }
+}
+
+@ExperimentalFoundationApi
+inline fun <T> LazyGridScope.items(
+    items: VisibilityList<T>,
+    noinline spans: (LazyGridItemSpanScope.(item: T) -> GridItemSpan)? = null,
+    enter: EnterTransition = EnterTransition.None,
+    exit: ExitTransition = ExitTransition.None,
+    exitDuration: Long = 0,
+    crossinline itemContent: @Composable LazyItemScope.(item: T) -> Unit
+){
+    items(
+        items.list,
+        spans = if(spans==null) null else {item: VisibleItem<T>->
+            spans.invoke(this,item.data)
+        }
+    ){
+        LaunchedEffect(key1 = it.visible){
+            if(!it.visible&&it.state==VisibleItem.State.ADDING){
+                items.makeVisible(it)
+                return@LaunchedEffect
+            }
+            if(!it.visible&&it.state==VisibleItem.State.REMOVING){
+                if(exitDuration>0){
+                    items.makeInvisible(it)
+                    delay(exitDuration)
+                }
+                items.delete(it)
+            }
+        }
+        Box(){
+            AnimatedVisibility(
+                it.visible,
+                enter = enter,
+                exit = exit
+            ) {
+                itemContent(it.data)
+            }
         }
     }
 }
