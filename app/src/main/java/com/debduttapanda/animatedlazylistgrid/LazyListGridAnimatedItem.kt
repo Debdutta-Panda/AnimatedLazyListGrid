@@ -10,9 +10,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
@@ -32,6 +34,7 @@ data class VisibleItem<T>(
 }
 
 class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = false){
+    private var _originalSize = mutableStateOf(0)
     private val visibilityList = mutableStateListOf<VisibleItem<T>>()
         .apply {
             val state = if(initialAnimated)
@@ -48,9 +51,8 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
                     )
                 }
             )
-            _originalSize = core.size
+            _originalSize.value = core.size
         }
-    private var _originalSize = 0
     val actualSize
         get() = visibilityList.size
     val size
@@ -66,7 +68,7 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
                 state = VisibleItem.State.ADDING
             )
         )
-        ++_originalSize
+        ++_originalSize.value
     }
 
     fun addAll(items: Iterable<T>, initialAnimated: Boolean = false){
@@ -82,7 +84,7 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
                 state = state
             )
         })
-        _originalSize += items.count()
+        _originalSize.value += items.count()
     }
 
     operator fun set(index: Int, item: T){
@@ -99,7 +101,7 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
             data = item,
             state = VisibleItem.State.ADDING
         ))
-        ++_originalSize
+        ++_originalSize.value
     }
 
     fun remove(item: T){
@@ -112,7 +114,22 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
                 data = item,
                 state = VisibleItem.State.REMOVING
             )
-            --_originalSize
+            --_originalSize.value
+        }
+    }
+
+    fun remove(block: (T)->Boolean){
+        val index = visibilityList.indexOfFirst {
+            block(it.data)
+        }
+        if(index > -1){
+            val item = visibilityList[index]
+            visibilityList[index] = VisibleItem(
+                visible = false,
+                data = item.data,
+                state = VisibleItem.State.REMOVING
+            )
+            --_originalSize.value
         }
     }
 
@@ -160,7 +177,7 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
             visibilityList.clear()
             visibilityList.addAll(list)
         }
-        _originalSize = 0
+        _originalSize.value = 0
     }
 
     fun indexOf(item: T):Int {
@@ -172,6 +189,10 @@ class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = f
     fun shuffle() {
         visibilityList.shuffle()
     }
+
+    fun isNotEmpty(): Boolean {
+        return _originalSize.value!=0
+    }
 }
 
 val <T>SnapshotStateList<T>.animated: VisibilityList<T>
@@ -180,7 +201,7 @@ val <T>SnapshotStateList<T>.animated: VisibilityList<T>
     }
 
 @OptIn(ExperimentalFoundationApi::class)
-inline fun <T> LazyListScope.items(
+inline fun <T> LazyListScope.animatedItems(
     items: VisibilityList<T>,
     noinline key: ((item: T) -> Any)? = null,
     enter: EnterTransition = EnterTransition.None,
@@ -227,7 +248,7 @@ inline fun <T> LazyListScope.items(
 
 //use this if not using compose foundation
 @ExperimentalFoundationApi
-inline fun <T> LazyGridScope.items(
+inline fun <T> LazyGridScope.animatedItems(
     items: VisibilityList<T>,
     noinline spans: (LazyGridItemSpanScope.(item: T) -> GridItemSpan)? = null,
     enter: EnterTransition = EnterTransition.None,
@@ -267,9 +288,9 @@ inline fun <T> LazyGridScope.items(
 }
 
 /*
-use this if you are using compose foundation
+//use this if using compose foundation
 @ExperimentalFoundationApi
-inline fun <T> LazyGridScope.items(
+inline fun <T> LazyGridScope.animatedItems(
     items: VisibilityList<T>,
     noinline key: ((item: T) -> Any)? = null,
     noinline span: (LazyGridItemSpanScope.(item: T) -> GridItemSpan)? = null,
