@@ -225,6 +225,7 @@ inline fun <T> LazyListScope.items(
     }
 }
 
+//use this if not using compose foundation
 @ExperimentalFoundationApi
 inline fun <T> LazyGridScope.items(
     items: VisibilityList<T>,
@@ -264,3 +265,61 @@ inline fun <T> LazyGridScope.items(
         }
     }
 }
+
+/*
+use this if you are using compose foundation
+@ExperimentalFoundationApi
+inline fun <T> LazyGridScope.items(
+    items: VisibilityList<T>,
+    noinline key: ((item: T) -> Any)? = null,
+    noinline span: (LazyGridItemSpanScope.(item: T) -> GridItemSpan)? = null,
+    noinline contentType: (item: T) -> Any? = { null },
+    crossinline itemContent: @Composable LazyGridItemScope.(item: T) -> Unit,
+    enter: EnterTransition = EnterTransition.None,
+    exit: ExitTransition = ExitTransition.None,
+    exitDuration: Long = 0,
+){
+    items(
+        items = items.list,
+        key =
+        if(key==null)
+            null
+        else
+            {item: VisibleItem<T>->
+                key(item.data)
+            },
+        span =
+        if(span==null)
+            null
+        else
+            {item: VisibleItem<T>->
+                span(this,item.data)
+            },
+        contentType = {item: VisibleItem<T>->
+            contentType(item.data)
+        },
+    ){
+        LaunchedEffect(key1 = it.visible){
+            if(!it.visible&&it.state==VisibleItem.State.ADDING){
+                items.makeVisible(it)
+                return@LaunchedEffect
+            }
+            if(!it.visible&&it.state==VisibleItem.State.REMOVING){
+                if(exitDuration>0){
+                    items.makeInvisible(it)
+                    delay(exitDuration)
+                }
+                items.dont_touch___delete(it)
+            }
+        }
+        Box(){
+            AnimatedVisibility(
+                it.visible,
+                enter = enter,
+                exit = exit,
+            ) {
+                itemContent(it.data)
+            }
+        }
+    }
+}*/
