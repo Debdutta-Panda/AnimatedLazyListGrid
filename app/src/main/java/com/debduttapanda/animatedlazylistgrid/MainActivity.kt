@@ -1,5 +1,7 @@
 package com.debduttapanda.animatedlazylistgrid
 
+import android.content.ClipData
+import android.content.ClipData.Item
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -12,9 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -39,89 +39,180 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colors.background
                 ) {
                     val vm: MyViewModel by viewModels()
-                    /*LazyRow{
-                        items(
-                            items = vm.numbers,
-                            key = {
-                                it
-                            },
-                            enter = fadeIn(tween(700))+ expandVertically(tween(700)),
-                            exit = fadeOut(tween(700))+ shrinkVertically(tween(700)),
-                            exitDuration = 700
+                    Column(){
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth()
                         ){
-                            Text(
-                                it.toString(),
-                                modifier = Modifier
-                                    .padding(top = 6.dp)
-                                    .size(100.dp)
-                                    .background(Color.LightGray)
-                                    .padding(12.dp)
-                                    .clickable {
-                                        vm.delete(it)
+                            item{
+                                Checkbox(
+                                    checked = vm.animated.value,
+                                    onCheckedChange = {
+                                        vm.animated.value = it
                                     }
-                            )
+                                )
+                            }
+                            item{
+                                Checkbox(
+                                    checked = vm.listType.value,
+                                    onCheckedChange = {
+                                        vm.listType.value = it
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = Color.Red,
+                                        uncheckedColor = Color.Red
+                                    )
+                                )
+                            }
+                            item{
+                                Button(onClick = {
+                                    vm.addSome()
+                                }) {
+                                    Text("Some")
+                                }
+                            }
+                            item{
+                                Button(onClick = {
+                                    vm.clearAll()
+                                }) {
+                                    Text("Clear")
+                                }
+                            }
+                            item{
+                                Button(onClick = {
+                                    vm.shuffle()
+                                }) {
+                                    Text("Shuffle")
+                                }
+                            }
                         }
-                    }*/
-
-
-                    LazyVerticalGrid(
-                        cells = GridCells.Fixed(3)
-                    ){
-                        /*items(
-                            vm.numbers
-                        ){
-                            Text(
-                                it.toString(),
-                                modifier = Modifier
-                                    .padding(top = 6.dp)
-                                    .size(100.dp)
-                                    .background(Color.LightGray)
-                                    .padding(12.dp)
-                                    .clickable {
-                                        vm.delete(it)
-                                    }
-                            )
-                        }*/
-                        items(
-                            vm.numbers,
-                            enter = fadeIn(tween(700)),
-                            exit = fadeOut(tween(700)),
-                            exitDuration = 700
-                        ){
-                            Text(
-                                it.toString(),
-                                modifier = Modifier
-                                    .padding(top = 6.dp)
-                                    .size(100.dp)
-                                    .background(Color.LightGray)
-                                    .padding(12.dp)
-                                    .clickable {
-                                        vm.delete(it)
-                                    }
-                            )
+                        if(vm.listType.value){
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize()
+                            ){
+                                items(
+                                    items = vm.numbers,
+                                    key = {
+                                        it.id
+                                    },
+                                    enter = fadeIn(tween(700))+ expandVertically(tween(700)),
+                                    exit = fadeOut(tween(700))+ shrinkVertically(tween(700)),
+                                    exitDuration = 700
+                                ){
+                                    ItemUI(
+                                        modifier = Modifier
+                                            .animateItemPlacement(
+                                                animationSpec = tween(2000)
+                                            ),
+                                        it,
+                                        vm
+                                    )
+                                }
+                            }
+                        }
+                        else{
+                            LazyVerticalGrid(
+                                cells = GridCells.Fixed(3)
+                            ){
+                                items(
+                                    vm.numbers,
+                                    enter = fadeIn(tween(700))+ expandVertically(tween(700)),
+                                    exit = fadeOut(tween(700))+ shrinkVertically(tween(700)),
+                                    exitDuration = 700
+                                ){
+                                    ItemUI(
+                                        modifier = Modifier.animateItemPlacement(),
+                                        it,
+                                        vm
+                                    )
+                                }
+                            }
                         }
                     }
-                    Text(vm.numbers.size.toString())
                 }
             }
         }
     }
+
+    @Composable
+    private fun ItemUI(
+        modifier: Modifier = Modifier,
+        item: ItemData,
+        vm: MyViewModel
+    ) {
+        Row(
+            modifier = modifier
+                .padding(top = 6.dp)
+                .fillMaxWidth()
+                .background(Color.LightGray)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ){
+            Text(item.value.toString())
+            Text(
+                "+",
+                modifier = Modifier
+                    .clickable {
+                        vm.addAfter(item)
+                    }
+            )
+            Text(
+                "-",
+                modifier = Modifier
+                    .clickable {
+                        vm.delete(item)
+                    }
+            )
+        }
+    }
 }
 
+data class ItemData(
+    val value: Int,
+    val id: String
+)
+
 class MyViewModel: ViewModel(){
+    fun newId(it: Int): String{
+        return System.currentTimeMillis().toString()+"_"+it.toString()
+    }
+    val listType = mutableStateOf(true)
+    val animated = mutableStateOf(false)
     var i = 0
-    val numbers = mutableStateListOf<Int>().animated
-    fun delete(it: Int) {
-        numbers.remove(it)
+    val numbers = mutableStateListOf<ItemData>().animated
+    fun delete(item: ItemData) {
+        numbers.remove(item)
     }
 
-    init {
-        viewModelScope.launch {
-            while (true){
-                delay(2000)
-                numbers.add(++i)
-            }
-        }
+    fun addSome() {
+        val s = i + 1
+        val e = i + 5
+        i = e
+        numbers.addAll((s..e).toList().map {
+            ItemData(
+                value = it,
+                id = newId(it)
+            )
+        },animated.value)
+    }
+
+    fun clearAll() {
+        numbers.clear(animated.value)
+    }
+
+    fun addAfter(item: ItemData) {
+        val index = numbers.indexOf(item)
+        numbers
+            .add(
+                index+1,
+                ItemData(
+                value = ++i,
+                id = newId(i)
+            )
+        )
+    }
+
+    fun shuffle() {
+        numbers.shuffle()
     }
 }
 
@@ -138,15 +229,20 @@ data class VisibleItem<T>(
     }
 }
 
-class VisibilityList<T>(core: SnapshotStateList<T>){
+class VisibilityList<T>(core: SnapshotStateList<T>, initialAnimated: Boolean = false){
     private val visibilityList = mutableStateListOf<VisibleItem<T>>()
         .apply {
+            val state = if(initialAnimated)
+                VisibleItem.State.ADDING
+            else
+                VisibleItem.State.ADDED
+            val visible = !initialAnimated
             addAll(
                 core.map {
                     VisibleItem(
-                        visible = true,
+                        visible = visible,
                         data = it,
-                        state = VisibleItem.State.ADDED
+                        state = state
                     )
                 }
             )
@@ -164,6 +260,29 @@ class VisibilityList<T>(core: SnapshotStateList<T>){
                 state = VisibleItem.State.ADDING
             )
         )
+    }
+
+    fun addAll(items: Iterable<T>, initialAnimated: Boolean = false){
+        val state = if(initialAnimated)
+            VisibleItem.State.ADDING
+        else
+            VisibleItem.State.ADDED
+        val visible = !initialAnimated
+        visibilityList.addAll(items.map {
+            VisibleItem(
+                visible = visible,
+                data = it,
+                state = state
+            )
+        })
+    }
+
+    operator fun set(index: Int, item: T){
+        val size = visibilityList.size
+        if(index in 0 until size){
+            val visibleItem = visibilityList[index]
+            visibilityList[index] = visibleItem.copy(data = item)
+        }
     }
 
     fun add(index: Int, item: T){
@@ -215,6 +334,33 @@ class VisibilityList<T>(core: SnapshotStateList<T>){
         }
         val success = visibilityList.removeAt(index)
         Log.d("fldkfdf","$success")
+    }
+
+    fun clear(animated: Boolean = false){
+        if(!animated){
+            visibilityList.clear()
+        }
+        else{
+            val list = visibilityList.map {
+                VisibleItem(
+                    visible = false,
+                    data = it.data,
+                    state = VisibleItem.State.REMOVING
+                )
+            }
+            visibilityList.clear()
+            visibilityList.addAll(list)
+        }
+    }
+
+    fun indexOf(item: T):Int {
+        return visibilityList.indexOfFirst {
+            it.data==item
+        }
+    }
+
+    fun shuffle() {
+        visibilityList.shuffle()
     }
 }
 
